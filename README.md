@@ -14,7 +14,7 @@ Clone this repository into your `custom_nodes` directory:
 
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/YOUR_USERNAME/ComfyUI-Hide-API-Templates.git
+git clone https://github.com/Chroma01/ComfyUI-Hide-API-Templates.git
 ```
 
 Then restart ComfyUI.
