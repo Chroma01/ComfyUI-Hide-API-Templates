@@ -1,0 +1,10 @@
+[project]
+name = "comfyui-hide-api-templates"
+description = "Hides API templates (partner/paid templates) from the Templates menu in ComfyUI"
+version = "1.0.0"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+
+[tool.comfy]
+PublisherId = "Chroma01"
+DisplayName = "Hide API Templates"
