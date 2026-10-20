@@ -50,7 +50,8 @@ _EXT["hide_api_templates"] = {"offline_mode": _OFFLINE}
 
 logging.info(
     "[HideApiTemplates] active (offline_mode=%s): hiding partner templates, "
-    "partner nodes and the ComfyUI Cloud sign-in button.",
+    "partner nodes, the ComfyUI Cloud sign-in button and the User settings "
+    "section (all toggleable in Settings).",
     _OFFLINE,
 )
 
