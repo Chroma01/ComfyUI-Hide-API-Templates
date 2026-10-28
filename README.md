@@ -6,9 +6,17 @@ Hides the ComfyUI "partner" / API surface from the UI:
 2. **Partner nodes** — removed from the Node Library and the create-node menu.
 3. **ComfyUI Cloud sign-in / login button** — hidden from the top bar.
 4. **"User" (My Account) settings section** — hidden from the Settings dialog.
+5. **"Deploy to Comfy API" promo item** — hidden from the workflow tab
+   context menu (right-click a workflow tab).
+6. **Comfy Org startup banner** — the `[INFO] ComfyUI is developed by
+   Comfy Org … platform.comfy.org/ascii …` console line (and the post-job
+   `/ascii-job` hints) is suppressed via the upstream
+   `COMFYUI_DISABLE_PRODUCT_TIPS` environment variable.
 
 Everything is on by default, and every item can be toggled at runtime
-(without reloading the page) from the Settings dialog.
+(without reloading the page) from the Settings dialog — except the startup
+banner, which takes effect on the next restart (it is printed before the
+browser ever connects).
 
 ## Installation
 
@@ -29,10 +37,10 @@ Then restart ComfyUI.
 
 ## Settings
 
-The extension registers four boolean settings, in the same place other
+The extension registers six boolean settings, in the same place other
 extensions put theirs: **Settings → Other → ComfyUI-Hide-API-Templates**.
 All default to `true` (hidden). Toggling one applies immediately, no reload
-needed.
+needed (`SuppressProductTips` applies on the next ComfyUI restart).
 
 | Setting | Controls |
 |---|---|
@@ -40,6 +48,8 @@ needed.
 | `HidePartnerNodes` | Partner nodes in the Node Library + create-node menu |
 | `HideSignInButton` | The ComfyUI Cloud sign-in button in the top bar |
 | `HideUserSettings` | The "User" (My Account) section in the Settings dialog |
+| `HideDeployToApi` | The "Deploy to Comfy API" item in the workflow tab context menu |
+| `SuppressProductTips` | The Comfy Org startup banner + `/ascii-job` hints in the server console |
 
 ## What Gets Hidden
 
@@ -49,6 +59,8 @@ needed.
 | Node Library + create-node menu | Nodes whose category starts with `partner/` (server partner API nodes) or `comfy cloud/` (frontend Comfy Cloud nodes) |
 | Sign-in button | The ComfyUI Cloud login control (`data-testid="login-button"`) |
 | User settings section | The hardcoded "User" nav item (`data-nav-id="user"`) of the Settings dialog |
+| Workflow tab context menu | The menu item whose text matches "Deploy to Comfy API" (`role="menuitem"`, locale key `contextMenu.deployToComfyApi`) |
+| Server console banner | Upstream `app/product_tips.py`, silenced via `COMFYUI_DISABLE_PRODUCT_TIPS=1` set at import time |
 
 Official open-source ComfyUI templates and regular nodes are left untouched.
 
@@ -68,7 +80,7 @@ arguments in `__init__.py`).
 The active mode is logged on load:
 
 ```
-[HideApiTemplates] active (offline_mode=True): hiding partner templates, partner nodes, the ComfyUI Cloud sign-in button and the User settings section (all toggleable in Settings).
+[HideApiTemplates] active (offline_mode=True): hiding partner templates, partner nodes, the ComfyUI Cloud sign-in button, the User settings section, the 'Deploy to Comfy API' tab-menu item and the Comfy Org startup banner (all toggleable in Settings; the banner toggle takes effect on restart).
 [HideApiTemplates] --offline active: partner nodes already absent, skipping node filtering.
 ```
 
@@ -91,16 +103,28 @@ The active mode is logged on load:
 - **User settings section** — "User" is a hardcoded nav item of the Settings
   dialog (not a registered setting), so it is hidden from the DOM via
   `display: none` while the setting is on.
+- **"Deploy to Comfy API" item** — the workflow-tab context menu is a Vue
+  component rebuilt on every right-click, so a `MutationObserver` catches
+  the freshly inserted menu and hides any `role="menuitem"` whose text
+  matches "Deploy to Comfy API" (the item ships with a "NEW" badge; both go
+  away together).
+- **Startup banner** — `__init__.py` reads `SuppressProductTips` from
+  `user/default/comfy.settings.json` at import time (custom nodes are
+  imported before the banner would be printed) and sets
+  `COMFYUI_DISABLE_PRODUCT_TIPS=1` — the switch upstream itself checks in
+  `app/product_tips.py`. It also silences the one-off `/ascii-job` hints
+  logged after finished jobs. A value the user exported manually is kept
+  (`setdefault`), so `COMFYUI_DISABLE_PRODUCT_TIPS=0` brings the tips back.
 - **Runtime toggling** — the client subscribes to the reactive Pinia
-  `setting` store, so flipping any of the four settings in the dialog applies
-  immediately (an interval fallback covers throttled/background tabs, and a
+  `setting` store, so flipping any setting in the dialog applies immediately
+  (an interval fallback covers throttled/background tabs, and a
   `MutationObserver` re-applies the rules to freshly inserted elements).
 
 ## Structure
 
 ```
 ComfyUI-Hide-API-Templates/
-├── __init__.py          # feature flags + --offline detection
+├── __init__.py          # feature flags + --offline detection + startup banner suppression
 ├── js/
 │   └── hide_api_templates.js
 ├── pyproject.toml

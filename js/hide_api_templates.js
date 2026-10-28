@@ -35,6 +35,11 @@ import { api } from "../../scripts/api.js";
 const PARTNER_CATEGORIES = ["partner/", "comfy cloud/"];
 const LOGIN_BUTTON_TESTID = "login-button";
 const USER_SETTINGS_NAV_ID = "user";
+// The workflow-tab context menu promo item ("Deploy to Comfy API", shipped
+// with a NEW badge). It is rendered as a DIV with role="menuitem"; text match
+// is stable across builds because the label comes from the en locale string
+// (contextMenu.deployToComfyApi).
+const DEPLOY_MENU_TEXT = /deploy to comfy api/i;
 
 // User settings (Settings dialog -> "Other" -> "ComfyUI-Hide-API-Templates").
 const SETTINGS = {
@@ -42,6 +47,12 @@ const SETTINGS = {
     nodes: "ComfyUI-Hide-API-Templates.HidePartnerNodes",
     signin: "ComfyUI-Hide-API-Templates.HideSignInButton",
     userSection: "ComfyUI-Hide-API-Templates.HideUserSettings",
+    deployApi: "ComfyUI-Hide-API-Templates.HideDeployToApi",
+    // Server-side: __init__.py reads this from the persisted settings file at
+    // startup to set COMFYUI_DISABLE_PRODUCT_TIPS. No client DOM guard — the
+    // banner is a console message, and this toggle only takes effect on
+    // restart (it is registered here just so the user has a UI control).
+    suppressTips: "ComfyUI-Hide-API-Templates.SuppressProductTips",
 };
 
 function isPartnerDef(def) {
@@ -87,6 +98,16 @@ function registerSettings() {
             SETTINGS.userSection,
             "Hide User settings section",
             "Hide the User (My Account) section from the Settings dialog.",
+        ],
+        [
+            SETTINGS.deployApi,
+            "Hide 'Deploy to Comfy API' menu item",
+            "Hide the 'Deploy to Comfy API' promo item from the workflow tab context menu.",
+        ],
+        [
+            SETTINGS.suppressTips,
+            "Suppress Comfy Org startup banner",
+            "Hide the '[INFO] ComfyUI is developed by Comfy Org ... platform.comfy.org/ascii' console banner and the post-job /ascii hints. Takes effect on next ComfyUI restart.",
         ],
     ];
 
@@ -280,6 +301,7 @@ function installDomGuards() {
         subscribed: false,
         lastLogin: null,
         lastUser: null,
+        lastDeploy: null,
         lastApplyTs: 0,
         errors: [],
     });
@@ -320,6 +342,23 @@ function installDomGuards() {
         return true;
     };
 
+    // The workflow-tab context menu is mounted fresh on every right-click,
+    // so its promo item is caught here (apply runs from the observer for
+    // every inserted subtree) and by the periodic re-apply.
+    const hideDeployItems = (scope, hide) => {
+        const want = hide ? "none" : "";
+        scope
+            .querySelectorAll('[role="menuitem"]')
+            .forEach((el) => {
+                if (!DEPLOY_MENU_TEXT.test(el.textContent || "")) {
+                    return;
+                }
+                if (el.style.display !== want) {
+                    el.style.display = want;
+                }
+            });
+    };
+
     const apply = (root) => {
         const scope = root?.querySelectorAll ? root : document;
         const hideLogin = readSetting(SETTINGS.signin) ? "none" : "";
@@ -338,6 +377,7 @@ function installDomGuards() {
                     el.style.display = hideUser;
                 }
             });
+        hideDeployItems(scope, readSetting(SETTINGS.deployApi));
     };
 
     // Re-apply whenever a setting value changes (e.g. the user toggles one
@@ -348,11 +388,13 @@ function installDomGuards() {
     // handles freshly inserted elements.
     let lastLoginHide = null;
     let lastUserHide = null;
+    let lastDeployHide = null;
     let subscribed = false;
     const forceApply = () => {
         try {
             lastLoginHide = readSetting(SETTINGS.signin);
             lastUserHide = readSetting(SETTINGS.userSection);
+            lastDeployHide = readSetting(SETTINGS.deployApi);
             apply(document);
             dbg.lastApplyTs = Date.now();
         } catch (e) {
@@ -375,11 +417,18 @@ function installDomGuards() {
                 dbg.subscribed = subscribed;
                 const hideLogin = readSetting(SETTINGS.signin);
                 const hideUser = readSetting(SETTINGS.userSection);
+                const hideDeploy = readSetting(SETTINGS.deployApi);
                 dbg.lastLogin = hideLogin;
                 dbg.lastUser = hideUser;
-                if (hideLogin !== lastLoginHide || hideUser !== lastUserHide) {
+                dbg.lastDeploy = hideDeploy;
+                if (
+                    hideLogin !== lastLoginHide ||
+                    hideUser !== lastUserHide ||
+                    hideDeploy !== lastDeployHide
+                ) {
                     lastLoginHide = hideLogin;
                     lastUserHide = hideUser;
+                    lastDeployHide = hideDeploy;
                     apply(document);
                     dbg.lastApplyTs = Date.now();
                 }
